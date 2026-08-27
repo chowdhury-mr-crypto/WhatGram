@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b8cff"><title>WhatGram — Realtime Chat</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#050a12;color:#eef6ff;font-family:system-ui,-apple-system,Segoe UI,Arial}.app{max-width:480px;min-height:100vh;margin:auto;background:#09111c}.top{height:64px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;background:#0d1724;border-bottom:1px solid #1d2a3a}.logo{font-size:23px;font-weight:900}.logo span{color:#20a7ff}.btn,.send{border:0;border-radius:13px;background:#1499ed;color:#fff;font-weight:800;padding:11px 15px}.icon{background:#152235;color:#fff;border:1px solid #293b53;border-radius:12px;width:40px;height:40px}.content{padding:18px 15px 86px}.title{font-size:28px;font-weight:900;margin:8px 0}.muted{color:#7f91a6;font-size:13px}.search,input{background:#121e2d;color:#fff;border:1px solid #26384e;border-radius:14px;outline:none}.search{padding:12px;margin:18px 0}.search input{width:100%;border:0;background:none}.person{display:flex;gap:12px;align-items:center;padding:13px 3px;border-bottom:1px solid #192637;cursor:pointer}.avatar{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#139eff,#526cff);font-weight:900}.person b{display:block}.person small{color:#8091a5}.auth{padding:30px 20px;min-height:100vh;display:grid;align-content:center}.auth h1{font-size:40px;margin:0 0 5px}.auth span{color:#20a7ff}.form{display:grid;gap:11px;margin-top:24px}.form input{padding:14px}.switch{text-align:center;color:#8294a9;font-size:13px;margin-top:16px;cursor:pointer}.error{color:#ff7d7d;font-size:13px;min-height:18px}.chathead{height:64px;display:flex;align-items:center;gap:10px;padding:0 12px;border-bottom:1px solid #1d2a3a}.back{background:none;border:0;color:#fff;font-size:30px}.chatbox{height:calc(100vh - 128px);overflow:auto;padding:15px 12px 78px}.bubble{max-width:78%;padding:10px 13px;border-radius:17px;margin:7px 0;font-size:14px;line-height:1.4}.mine{margin-left:auto;background:#147dc1;border-bottom-right-radius:5px}.theirs{background:#162333;border-bottom-left-radius:5px}.time{font-size:10px;opacity:.55;margin-top:3px}.composer{position:fixed;bottom:0;width:min(480px,100%);padding:10px;background:#0d1724;border-top:1px solid #1d2a3a;display:flex;gap:8px}.composer input{flex:1;padding:12px}.send{width:48px}.nav{position:fixed;bottom:0;width:min(480px,100%);height:64px;background:#0d1724eF;border-top:1px solid #1d2a3a;display:flex;justify-content:space-around;align-items:center}.nav button{background:none;border:0;color:#8291a4;font-size:11px}.nav button.active{color:#20a7ff}.nav i{display:block;font-style:normal;font-size:19px}.hidden{display:none!important}.empty{text-align:center;padding:40px;color:#73859a}
+</style>
+</head>
+<body>
+<div class="app">
+<div id="auth" class="auth">
+  <h1>What<span>Gram</span></h1><div class="muted">Realtime messaging, built for your app.</div>
+  <div class="form" id="form">
+    <input id="name" placeholder="Display name" maxlength="40">
+    <input id="username" placeholder="Username (e.g. riyan)" maxlength="24">
+    <input id="password" placeholder="Password (6+ characters)" type="password">
+    <div id="err" class="error"></div><button class="btn" onclick="submitAuth()">Create account</button>
+  </div>
+  <div id="switch" class="switch" onclick="toggleAuth()">Already have an account? Log in</div>
+</div>
+
+<div id="home" class="hidden">
+  <header class="top"><button class="icon" onclick="logout()">↪</button><div class="logo">What<span>Gram</span></div><button class="icon" onclick="loadUsers()">↻</button></header>
+  <main class="content"><div class="title">Chats</div><div class="muted" id="hello"></div>
+  <div class="search"><input id="search" placeholder="Search people..." oninput="filterUsers()"></div>
+  <div id="people"></div></main>
+  <nav class="nav"><button class="active"><i>💬</i>Chats</button><button onclick="loadUsers()"><i>👥</i>People</button><button onclick="logout()"><i>⎋</i>Logout</button></nav>
+</div>
+
+<div id="chat" class="hidden">
+  <header class="chathead"><button class="back" onclick="showHome()">‹</button><div id="cavatar" class="avatar">R</div><div><b id="cname">User</b><small class="muted" style="display:block">● realtime</small></div></header>
+  <div id="chatbox" class="chatbox"></div>
+  <div class="composer"><input id="message" placeholder="Write a message..." onkeydown="if(event.key==='Enter')sendMessage()"><button class="send" onclick="sendMessage()">➤</button></div>
+</div>
+</div>
+<script>
+let mode="register",token=localStorage.getItem("wg_token"),me=null,users=[],current=null,ws=null;
+const $=id=>document.getElementById(id);
+function toggleAuth(){mode=mode==="register"?"login":"register";$("name").classList.toggle("hidden",mode==="login");$("form").querySelector(".btn").textContent=mode==="register"?"Create account":"Log in";$("switch").textContent=mode==="register"?"Already have an account? Log in":"New here? Create account";$("err").textContent=""}
+async function submitAuth(){
+ $("err").textContent="";let username=$("username").value.trim(),password=$("password").value,displayName=$("name").value.trim();
+ let url=mode==="register"?"/api/register":"/api/login",body=mode==="register"?{username,password,displayName}:{username,password};
+ try{let r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}),d=await r.json();if(!r.ok)throw Error(d.error||"Something went wrong");token=d.token;me=d.user;localStorage.setItem("wg_token",token);startApp()}catch(e){$("err").textContent=e.message}}
+async function startApp(){
+ if(!token)return;try{let r=await fetch("/api/me",{headers:{Authorization:"Bearer "+token}});if(!r.ok)throw 0;me=(await r.json()).user;showHome();connectWS();loadUsers()}catch{logout()}}
+function connectWS(){if(ws&&ws.readyState<2)return;let proto=location.protocol==="https:"?"wss":"ws";ws=new WebSocket(`${proto}://${location.host}/?token=${encodeURIComponent(token)}`);ws.onmessage=e=>{let d=JSON.parse(e.data);if(d.type==="message"&&current&&(d.message.sender_id===current.id||d.message.receiver_id===current.id))renderMessagesAdd(d.message)};ws.onclose=()=>setTimeout(connectWS,2000)}
+async function loadUsers(){try{let r=await fetch("/api/users",{headers:{Authorization:"Bearer "+token}});if(!r.ok)throw 0;users=(await r.json()).users;renderUsers(users)}catch(e){}}
+function renderUsers(list){$("people").innerHTML=list.length?list.map(u=>`<div class="person" onclick="openChat(${u.id})"><div class="avatar">${escapeHtml(u.display_name[0].toUpperCase())}</div><div><b>${escapeHtml(u.display_name)}</b><small>@${escapeHtml(u.username)}</small></div></div>`).join(""):'<div class="empty">No other users yet. Create a second account on another phone/browser to test realtime chat.</div>'}
+function filterUsers(){let q=$("search").value.toLowerCase();renderUsers(users.filter(u=>(u.display_name+" "+u.username).toLowerCase().includes(q)))}
+async function openChat(id){current=users.find(u=>u.id===id);$("cname").textContent=current.display_name;$("cavatar").textContent=current.display_name[0].toUpperCase();$("home").classList.add("hidden");$("chat").classList.remove("hidden");let r=await fetch("/api/messages/"+id,{headers:{Authorization:"Bearer "+token}});let d=await r.json();renderMessages(d.messages||[])}
+function renderMessages(arr){$("chatbox").innerHTML=arr.map(messageHtml).join("");scroll()}
+function renderMessagesAdd(m){let box=$("chatbox");box.insertAdjacentHTML("beforeend",messageHtml(m));scroll()}
+function messageHtml(m){let mine=m.sender_id===me.id;return `<div class="bubble ${mine?"mine":"theirs"}">${escapeHtml(m.body)}<div class="time">${new Date(m.created_at).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</div></div>`}
+function sendMessage(){let input=$("message"),body=input.value.trim();if(!body||!current||!ws||ws.readyState!==1)return;ws.send(JSON.stringify({type:"message",receiverId:current.id,body}));input.value=""}
+function scroll(){let b=$("chatbox");b.scrollTop=b.scrollHeight}
+function showHome(){$("chat").classList.add("hidden");$("home").classList.remove("hidden");current=null;loadUsers()}
+function logout(){localStorage.removeItem("wg_token");token=null;if(ws)ws.close();location.reload()}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+function show(id){$("auth").classList.add("hidden");$("home").classList.add("hidden");$("chat").classList.add("hidden");$(id).classList.remove("hidden")}
+function showHome(){show("home");loadUsers()}
+if(token)startApp();
+</script>
+</body>
+</html>
