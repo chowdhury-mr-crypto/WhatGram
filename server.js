@@ -158,7 +158,9 @@ wss.on("connection",(ws,req)=>{
   } catch { ws.close(1008,"Unauthorized"); }
 });
 
-app.get("*",(req,res)=>{
+app.get("/{*splat}", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
   res.sendFile(path.join(__dirname,"public","index.html"));
 });
 
